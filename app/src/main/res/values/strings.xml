@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Fall detector</string>
+    <string name="measure_x_y_z">Измерение ускорения в пространстве по осям X, Y, Z:</string>
+    <string name="ax">ax</string>
+    <string name="ay">ay</string>
+    <string name="az">az</string>
+    <string name="phone_number_setting">Настроить номер телефона</string>
+    <string name="start_detector">Старт</string>
+    <string name="hint_input_number_phone">Введите номер телефона, на который будет отправлено смс с координатами местонахождения, в случае Вашего падения</string>
+    <string name="hint_et_phone_number">8 XXX XXX-XX-XX</string>
+    <string name="cancel">Отмена</string>
+    <string name="accept">Применить</string>
+</resources>
