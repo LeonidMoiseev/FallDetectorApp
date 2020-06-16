@@ -17,7 +17,6 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import com.thenightlion.mbs.R
 import com.thenightlion.mbs.service.*
 import com.thenightlion.mbs.utils.App
@@ -56,22 +55,33 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         btnPhoneNumberSetting.setOnClickListener { dialogPhoneSetting() }
         btnStartOrStopDetector.setOnClickListener {
             updateCheckStartAndNumberPhone()
-            if (currentNumberPhone != "null") {
-                if (App.getInstance().permissionsUtils.checkPermissionSendSMS()) {
-                    if (App.getInstance().permissionsUtils.checkPermissionLocation()) {
-                        if (isLocationEnabled()) {
-                            if (checkStart == "stopped" || checkStart == "null") {
+            if (checkStart == "stopped" || checkStart == "null") {
+                if (currentNumberPhone != "null") {
+                    if (App.getInstance().permissionsUtils.checkPermissionSendSMS()) {
+                        if (App.getInstance().permissionsUtils.checkPermissionLocation()) {
+                            if (isLocationEnabled()) {
+
                                 startServiceAndSensor()
-                            } else if (checkStart == "started") {
-                                stopServiceAndSensor()
-                            }
-                        } else Toast.makeText(this, "Включите геолокацию на вашем телефоне", Toast.LENGTH_LONG).show()
-                    } else requestPermissionLocation()
-                } else startRequestPermission(
-                    arrayOf(Manifest.permission.SEND_SMS),
-                    REQUEST_CODE_PERMISSION_SEND_SMS
-                )
-            } else Toast.makeText(this, "Настройте номер телефона", Toast.LENGTH_LONG).show()
+
+                            } else Toast.makeText(
+                                this, "Включите геолокацию на вашем телефоне", Toast.LENGTH_LONG
+                            ).show()
+                        } else startRequestPermission(
+                            arrayOf(
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ),
+                            REQUEST_CODE_PERMISSION_GPS
+                        )
+                    } else startRequestPermission(
+                        arrayOf(Manifest.permission.SEND_SMS),
+                        REQUEST_CODE_PERMISSION_SEND_SMS
+                    )
+                } else Toast.makeText(this, "Настройте номер телефона", Toast.LENGTH_LONG).show()
+
+            } else if (checkStart == "started") {
+                stopServiceAndSensor()
+            }
         }
     }
 
@@ -101,15 +111,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     ) {
         when (requestCode) {
             REQUEST_CODE_PERMISSION_SEND_SMS -> {
-                requestPermissionLocation()
+                startRequestPermission(
+                    arrayOf(
+                        Manifest.permission.ACCESS_COARSE_LOCATION,
+                        Manifest.permission.ACCESS_FINE_LOCATION
+                    ),
+                    REQUEST_CODE_PERMISSION_GPS
+                )
             }
             REQUEST_CODE_PERMISSION_GPS -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (isLocationEnabled()) {
                         startServiceAndSensor()
-                    } else Toast.makeText(this, "Включите геолокацию на вашем телефоне", Toast.LENGTH_LONG).show()
+                    } else Toast.makeText(
+                        this,
+                        "Включите геолокацию на вашем телефоне",
+                        Toast.LENGTH_LONG
+                    ).show()
                 } else {
-                    Toast.makeText(this, "Отказано в доступе к разрешениям", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Отказано в доступе к разрешениям", Toast.LENGTH_SHORT)
+                        .show()
                 }
                 return
             }
@@ -138,16 +159,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    private fun requestPermissionLocation() {
+    /*private fun requestPermissionLocation() {
         ActivityCompat.requestPermissions(
             this,
             arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION),
             REQUEST_CODE_PERMISSION_GPS
         )
-    }
+    }*/
 
     private fun isLocationEnabled(): Boolean {
-        var locationManager: LocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationManager: LocationManager =
+            getSystemService(Context.LOCATION_SERVICE) as LocationManager
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) || locationManager.isProviderEnabled(
             LocationManager.NETWORK_PROVIDER
         )
@@ -234,4 +256,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             tv_az.text = "aZ: ${"%.2f".format(az)}"
         }
     }
+
+    /*@SuppressLint("SetTextI18n")
+    override fun onResume() {
+        super.onResume()
+        if (App.instance.sharedPreferencesUtils.getString("fall") == "yes") {
+            nameApp.text = "DETECTED!!!"
+            App.instance.sharedPreferencesUtils.putString("fall", "no")
+        } else nameApp.text = getString(R.string.app_name)
+    }*/
 }

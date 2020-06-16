@@ -12,10 +12,7 @@ import android.hardware.SensorManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
-import android.os.IBinder
-import android.os.Looper
-import android.os.PowerManager
+import android.os.*
 import android.provider.Settings
 import android.telephony.SmsManager
 import android.widget.Toast
@@ -25,6 +22,7 @@ import com.github.kittinunf.fuel.core.extensions.jsonBody
 import com.google.android.gms.location.*
 import com.thenightlion.mbs.R
 import com.thenightlion.mbs.ui.MainActivity
+import com.thenightlion.mbs.utils.App
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
@@ -34,19 +32,28 @@ import java.util.*
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-const val SHAKE_THRESHOLD = 15.00f
-const val MIN_TIME_BETWEEN_SHAKES_MILLISECS = 5000
+const val MIN_THRESHOLD = 4.0
+const val MAX_THRESHOLD = 30.0
 
 class FallDetectorService : Service(), SensorEventListener {
+
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private lateinit var sensorManager: SensorManager
     private lateinit var mySensor: Sensor
-    lateinit var mFusedLocationClient: FusedLocationProviderClient
-//    private var ax: Double = 0.0
-//    private var ay: Double = 0.0
-//    private var az: Double = 0.0
-    private var mLastShakeTime: Long = 0
+    private lateinit var mFusedLocationClient: FusedLocationProviderClient
+
+    private var x: Double = 0.0
+    private var y: Double = 0.0
+    private var z: Double = 0.0
+    private var sqrtAcceleration: Double = 0.0
+    private var minThresholdPassed = false
+    private var maxThresholdPassed = false
+    private var fallDetected = false
+    private var startTimeFreeFall = 0L
+    private var lastTimeFreeFall = 0L
+    private var diff = 0L
+    private var counter = 0
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
 
@@ -54,25 +61,77 @@ class FallDetectorService : Service(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-            val curTime = System.currentTimeMillis()
-            if (curTime - mLastShakeTime > MIN_TIME_BETWEEN_SHAKES_MILLISECS) {
-                val x = event.values[0]
-                val y = event.values[1]
-                val z = event.values[2]
-                val acceleration = sqrt(
-                    x.toDouble().pow(2.0) +
-                            y.toDouble().pow(2.0) +
-                            z.toDouble().pow(2.0)
-                ) - SensorManager.GRAVITY_EARTH
-                if (acceleration > SHAKE_THRESHOLD) {
-                    mLastShakeTime = curTime
-                    getLastLocation()
-                }
-            }
+            x = event.values[0].toDouble()
+            y = event.values[1].toDouble()
+            z = event.values[2].toDouble()
+
+            fallDetectorAlgorithm()
         }
     }
 
-    /*private fun sendSMS(phoneNo: String?, msg: String?) {
+    private fun fallDetectorAlgorithm() {
+        sqrtAcceleration= sqrt(x.pow(2) + y.pow(2) + z.pow(2))
+
+        if (sqrtAcceleration < MIN_THRESHOLD && !minThresholdPassed)
+        {
+            minThresholdPassed = true
+            startTimeFreeFall = System.currentTimeMillis()
+            Toast.makeText(this,"free fall to ground $sqrtAcceleration",Toast.LENGTH_SHORT).show()
+        }
+
+        if (minThresholdPassed)
+        {
+            counter++
+            if (sqrtAcceleration >= MAX_THRESHOLD && !maxThresholdPassed) {
+                lastTimeFreeFall = System.currentTimeMillis()
+                diff = lastTimeFreeFall - startTimeFreeFall
+                Toast.makeText(this,"diff:$diff\n $sqrtAcceleration",Toast.LENGTH_LONG).show()
+
+                if (diff in 100..5000)
+                {
+                    maxThresholdPassed = true
+
+                    if(maxThresholdPassed && minThresholdPassed) {
+
+                        fallDetected = true
+
+                        val timer = object : CountDownTimer(5000, 1000) {
+                            override fun onTick(millisUntilFinished: Long) {
+                                if (millisUntilFinished < 4000 && sqrtAcceleration !in 8.0..11.0) {
+                                    fallDetected = false
+                                }
+                            }
+
+                            override fun onFinish() {
+                                if (fallDetected) {
+
+                                    getLastLocation()
+                                    //App.instance.sharedPreferencesUtils.putString("fall", "yes")
+                                    //Toast.makeText(applicationContext,"fall detected $sqrtAcceleration",Toast.LENGTH_LONG).show()
+
+                                    x = 0.0
+                                    y = 0.0
+                                    z = 0.0
+                                    minThresholdPassed = false
+                                    maxThresholdPassed = false
+                                }
+                            }
+                        }
+                        timer.start()
+                    }
+                }
+            }
+        }
+
+        if (counter > 10)
+        {
+            counter = 0
+            minThresholdPassed = false
+            maxThresholdPassed = false
+        }
+    }
+
+    private fun sendSMS(phoneNo: String?, msg: String?) {
         try {
             val smsManager = SmsManager.getDefault()
             smsManager.sendTextMessage(phoneNo, null, msg, null, null)
@@ -81,7 +140,7 @@ class FallDetectorService : Service(), SensorEventListener {
             Toast.makeText(this, "Error Sent SMS", Toast.LENGTH_LONG).show()
             ex.printStackTrace()
         }
-    }*/
+    }
 
     @SuppressLint("MissingPermission")
     private fun getLastLocation() {
@@ -96,8 +155,8 @@ class FallDetectorService : Service(), SensorEventListener {
             }
         } else {
             Toast.makeText(this, "Включите геолокацию на вашем телефоне", Toast.LENGTH_LONG).show()
-            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-            startActivity(intent)
+            /*val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            startActivity(intent)*/
         }
     }
 
@@ -124,19 +183,17 @@ class FallDetectorService : Service(), SensorEventListener {
     }
 
     private fun showLocation(latitude: String, longitude: String) {
-        var geocoder = Geocoder(this, Locale.getDefault())
-        var addresses = geocoder.getFromLocation(latitude.toDouble(), longitude.toDouble(), 1)
-        var address = addresses[0].getAddressLine(0)
+        val geocoder = Geocoder(this, Locale.getDefault())
+        val addresses = geocoder.getFromLocation(latitude.toDouble(), longitude.toDouble(), 1)
+        val address = addresses[0].getAddressLine(0)
         /*Toast.makeText(
             this,
             "Широта: $latitude\nДолгота:$longitude",
             Toast.LENGTH_LONG
         ).show()*/
-        Toast.makeText(
-            this,
-            address,
-            Toast.LENGTH_LONG
-        ).show()
+        //Toast.makeText(this, address, Toast.LENGTH_LONG).show()
+
+        sendSMS(App.instance.sharedPreferencesUtils.getString("phoneNumber"), address)
     }
 
     private fun isLocationEnabled(): Boolean {
