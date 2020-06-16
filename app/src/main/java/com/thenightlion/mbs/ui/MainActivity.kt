@@ -111,13 +111,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     ) {
         when (requestCode) {
             REQUEST_CODE_PERMISSION_SEND_SMS -> {
-                startRequestPermission(
-                    arrayOf(
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    ),
-                    REQUEST_CODE_PERMISSION_GPS
-                )
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startRequestPermission(
+                        arrayOf(
+                            Manifest.permission.ACCESS_COARSE_LOCATION,
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ),
+                        REQUEST_CODE_PERMISSION_GPS
+                    )
+                } else {
+                    Toast.makeText(this, "Отказано в доступе к разрешениям", Toast.LENGTH_SHORT)
+                        .show()
+                }
+                return
             }
             REQUEST_CODE_PERMISSION_GPS -> {
                 if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -187,8 +193,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         viewDialogPhoneNumber.btnCancel.setOnClickListener { dialogPhoneSetting.dismiss() }
         viewDialogPhoneNumber.btnAccept.setOnClickListener {
-            if (viewDialogPhoneNumber.etPhoneNumber.text.length == 15) {
-                saveNumber(viewDialogPhoneNumber.etPhoneNumber.text.toString().trim())
+            val numberStr = viewDialogPhoneNumber.etPhoneNumber.text.toString().trim()
+            val onlyNumbers = getOnlyNumerics(numberStr)
+            if (onlyNumbers!!.length == 11) {
+                saveNumber(onlyNumbers)
                 dialogPhoneSetting.dismiss()
             } else Toast.makeText(this, "Неверный формат номера", Toast.LENGTH_SHORT).show()
         }
@@ -200,8 +208,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         )
     }
 
-    private fun saveNumber(numberStr: String) {
-        val number = getOnlyNumerics(numberStr)
+    private fun saveNumber(number: String) {
         App.instance.sharedPreferencesUtils.putString(PHONE_NUMBER_KEY, number)
         currentNumberPhone = App.instance.sharedPreferencesUtils.getString(PHONE_NUMBER_KEY)
         Toast.makeText(this, "Номер сохранён", Toast.LENGTH_SHORT).show()

@@ -183,8 +183,8 @@ class FallDetectorService : Service(), SensorEventListener {
     }
 
     private fun showLocation(latitude: String, longitude: String) {
-        val geocoder = Geocoder(this, Locale.getDefault())
-        val addresses = geocoder.getFromLocation(latitude.toDouble(), longitude.toDouble(), 1)
+        val geoCoder = Geocoder(this, Locale.getDefault())
+        val addresses = geoCoder.getFromLocation(latitude.toDouble(), longitude.toDouble(), 1)
         val address = addresses[0].getAddressLine(0)
         /*Toast.makeText(
             this,
